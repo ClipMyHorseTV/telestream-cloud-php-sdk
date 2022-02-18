@@ -2,18 +2,23 @@
 
 namespace TelestreamCloudTts;
 
-class UploaderFileSession {
+use Exception;
+
+class UploaderFileSession
+{
     protected $path;
     protected $uploader;
     protected $tag;
 
-    public function __construct($uploader, $path, $tag = null) {
+    public function __construct($uploader, $path, $tag = null)
+    {
         $this->path = $path;
         $this->uploader = $uploader;
         $this->tag = $tag;
     }
 
-    public function getParams() {
+    public function getParams()
+    {
         $params = array(
             'file_size' => filesize($this->path),
             'file_name' => basename($this->path),
@@ -26,7 +31,8 @@ class UploaderFileSession {
         return $params;
     }
 
-    public function upload() {
+    public function upload()
+    {
         $file = fopen($this->path, "r");
 
         $parts = $this->getMissingParts();
@@ -50,11 +56,13 @@ class UploaderFileSession {
         }
     }
 
-    protected function getSession() {
+    protected function getSession()
+    {
         return $this->uploader->session;
     }
 
-    protected function getMissingParts() {
+    protected function getMissingParts()
+    {
         $session = $this->getSession();
 
         $headers = array();
@@ -72,7 +80,8 @@ class UploaderFileSession {
         return json_decode($response, true)['missing_parts'];
     }
 
-    protected function sendChunk($file, $session, $index) {
+    protected function sendChunk($file, $session, $index)
+    {
         $curl = curl_init();
 
         $headers = [];
@@ -97,11 +106,13 @@ class UploaderFileSession {
         return json_decode($response, true);
     }
 
-    protected function location() {
+    protected function location()
+    {
         return $this->getSession()['location'];
     }
 
-    protected function partSize() {
+    protected function partSize()
+    {
         $session = $this->getSession();
 
 
@@ -124,14 +135,16 @@ class Uploader
     protected $params;
     protected $factoryId;
 
-    public function __construct($client, $params) {
+    public function __construct($client, $params)
+    {
         $this->client = $client;
         $this->params = $params;
 
         $this->parseExtraFiles();
     }
 
-    public function upload() {
+    public function upload()
+    {
         if (!$this->session) {
             $this->session = $this->createSession($this->params);
         }
@@ -139,13 +152,14 @@ class Uploader
         $this->retryableUpload(5);
 
         if (!$this->result) {
-            throw new \Exception("Missing upload result");
+            throw new Exception("Missing upload result");
         }
 
         return $this->result['id'];
     }
 
-    protected function retryableUpload($attempt) {
+    protected function retryableUpload($attempt)
+    {
         try {
             $this->file->upload();
 
@@ -154,7 +168,7 @@ class Uploader
             }
 
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             if ($attempt > 0) {
                 return $this->retryableUpload($attempt - 1);
             }
@@ -163,7 +177,8 @@ class Uploader
         }
     }
 
-    protected function parseExtraFiles() {
+    protected function parseExtraFiles()
+    {
         $this->file = new UploaderFileSession($this, $this->params['file']);
 
         $extraFiles = $this->params['extra_files'];
@@ -186,17 +201,19 @@ class Uploader
         }
     }
 
-    public function setResult($result) {
+    public function setResult($result)
+    {
         $this->result = $result;
     }
 
-    protected function createSession($params) {
+    protected function createSession($params)
+    {
         $params = array_merge(
             $params,
             $this->file->getParams(),
             array(
                 'multi_chunk' => 'true',
-                'extra_files' => array_map(function($extraFile) {
+                'extra_files' => array_map(function ($extraFile) {
                     return $extraFile->getParams();
                 }, $this->extraFiles)
             )
@@ -220,21 +237,20 @@ class Uploader
 
 
         switch (get_class($this->client)) {
-        case "TelestreamCloudFlip\Api\FlipApi":
-            if (!$this->factoryId) {
-                $this->factoryId = $params['factory_id'];
-                unset($params['factory_id']);
-            }
+            case "TelestreamCloudFlip\Api\FlipApi":
+                if (!$this->factoryId) {
+                    $this->factoryId = $params['factory_id'];
+                    unset($params['factory_id']);
+                }
 
-            return $this->client->uploadVideo($this->factoryId, $payload);
-        default:
-            if (!$this->factoryId) {
-                $this->factoryId = $params['project_id'];
-                unset($params['project_id']);
-            }
+                return $this->client->uploadVideo($this->factoryId, $payload);
+            default:
+                if (!$this->factoryId) {
+                    $this->factoryId = $params['project_id'];
+                    unset($params['project_id']);
+                }
 
-            return $this->client->uploadVideo($this->factoryId, $payload);
+                return $this->client->uploadVideo($this->factoryId, $payload);
         }
     }
 }
-?>
